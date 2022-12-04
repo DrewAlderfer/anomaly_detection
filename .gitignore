@@ -6,15 +6,18 @@
 # website: http://jupyter.org/
 
 .ipynb_checkpoints
-.ipynb_checkpoints/*
+*/.ipynb_checkpoints/*
 
 # IPython
 profile_default/
 ipython_config.py
 
 # Local Setting for Jupyter-Server Logs
-.secret/*
+*/.secret/*
 .secret
+
+# My data files
+data/*
 
 # Remove previous ipynb_checkpoints
 #   git rm -r .ipynb_checkpoints/
