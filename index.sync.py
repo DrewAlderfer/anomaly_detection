@@ -95,6 +95,7 @@ for ax in ax_test_sample.flatten():
     ax.axis('off')
     ax.set_title(f"{test_data[test_ind].split('/')[-2]}", fontsize=10)
 fig_test_samp.tight_layout()
+plt.savefig("./images/eda_anom_grid.png")
 plt.show()
 
 # %%
@@ -155,10 +156,10 @@ train_classes
 # %%
 # TODO: Generalize this into a helper function
 plt.figure(figsize=(8,8))
-for images, labels in x_train.take(1):
+for images, labels in x_train:
     for i in range(9):
         ax = plt.subplot(3, 3, i + 1)
-        plt.imshow(images[i].numpy().astype("float16"), cmap='gray')
+        plt.imshow(images.numpy().astype("float16"), cmap='gray')
         plt.title(train_classes[0])
         plt.axis('off')
 plt.savefig("./images/eda_train_samp.png")

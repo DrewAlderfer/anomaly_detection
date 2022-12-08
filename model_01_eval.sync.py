@@ -70,6 +70,7 @@ for i in range(5):
     ax = plt.subplot(1, 5, i + 1)
     plt.imshow(test[i])
     plt.axis("off")
+plt.savefig("./images/norm_recconstr_05_line.png")
 plt.show()
 
 # %% [markdown]
@@ -94,6 +95,7 @@ print(type(test_anom_norm))
 for img in test_anom_norm:
     print(type(img))
     plt.imshow(img)
+    plt.savefig("./images/anom_screw.png")
     plt.show()
     break
 
@@ -101,6 +103,7 @@ for img in test_anom_norm:
 x_anom_np = np.array(
     list(map(lambda x: x, test_anom_norm.as_numpy_iterator())), "float32"
 )
+# Separate the Anomalous Screws from the Normal Test Set
 x_anom_np = x_anom_np[41:]
 print(x_anom_np.shape)
 
@@ -119,6 +122,7 @@ for i in range(5):
     ax = plt.subplot(1, 5, i + 1)
     plt.imshow(test[i])
     plt.axis("off")
+plt.savefig("./images/anom.png", dpi=150)
 plt.show()
 
 # %% [markdown]
@@ -178,7 +182,7 @@ norm_y = norm_y / norm_y.max()
 anom_y, anom_x = np.histogram(loss_anom, bins=20)
 anom_y = anom_y / anom_y.max()
 
-fig, ax = plt.subplots()
+fig, ax = plt.subplots(figsize=(8,5))
 # plt.bar(x=norm_bar_x, height=norm_bar_y, width=np.diff(norm_bar_x)[0], alpha=0.2)
 # plt.step(x=norm_bar_x, y=norm_bar_y, where='mid', alpha=.6)
 ax.stairs(norm_y, norm_x, hatch=('...'), label="Normal")
@@ -191,7 +195,7 @@ plt.xlabel("Loss Values")
 plt.ylabel("Number of Values per Bin")
 plt.title("Relative Distributions of Loss Values")
 plt.legend()
-plt.savefig("./images/anom_norm_dist.png")
+plt.savefig("./images/anom_norm_dist.png", dpi=300, bbox_inches='tight', pad_inches=.5)
 plt.show()
 
 
