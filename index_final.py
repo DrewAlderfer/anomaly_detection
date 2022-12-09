@@ -96,26 +96,6 @@ fig_test_samp.tight_layout()
 plt.savefig("./images/eda_anom_grid.png")
 plt.show()
 
-# %%
-# TODO: Generalize this into a helper function
-plt.figure(figsize=(8,8))
-for images, labels in x_train:
-    for i in range(9):
-        ax = plt.subplot(3, 3, i + 1)
-        plt.imshow(images[i].numpy().astype("float16"), cmap='gray')
-        plt.title(train_classes[0])
-        plt.axis('off')
-plt.savefig("./images/eda_train_samp.png")
-plt.close()
-
-
-# %% [markdown]
-# ##### TODO:
-# *You should generalize the above the cell into a util function.*
-#
-# ## Training Data Sample
-# A sample of images from the training set with their cooresponding label.
-# <img src='./images/eda_train_samp.png' align="left">
 
 # %% [markdown]
 # ## First Model
@@ -234,6 +214,7 @@ for i in range(num_of_imgs):
     plt.imshow(decoded_imgs[i], cmap='gray')
     plt.title("reconstructed")
     ax.axis('off')
+plt.savefig("./images/first_model_output_vis.png")
 plt.show()
 
 # %% [markdown]
@@ -306,14 +287,16 @@ class AutoEncoder(Model):
         super(AutoEncoder, self).__init__()
         self.encoder = tf.keras.models.Sequential([
             layers.Input(shape=(200, 200, 1)),
-            layers.Conv2D(32, (3, 3), activation='relu', padding='same', strides=1),
+            layers.Conv2D(32, (4, 4), activation='relu', padding='same', strides=1),
             layers.MaxPool2D((2,2), padding='same', data_format='channels_last'),
-            layers.Conv2D(16, (3, 3), activation='relu', padding='same', strides=1),
+            layers.Conv2D(16, (4, 4), activation='relu', padding='same', strides=1),
             layers.MaxPool2D((2,2), padding='same', data_format='channels_last'),
-            layers.Conv2D(8, (3, 3), activation='relu', padding='same', strides=1)
+            layers.Conv2D(8, (4, 4), activation='relu', padding='same', strides=1)
             ])
         self.decoder = Sequential([
             layers.Conv2DTranspose(8, 3, strides=2, activation='relu', padding='same'),
+            layers.Conv2DTranspose(16, 3, strides=2, activation='relu', padding='same'),
+            layers.Conv2DTranspose(32, 3, strides=2, activation='relu', padding='same'),
             layers.Conv2D(1, 3, strides=2, activation='sigmoid', padding='same')
             ])
 
@@ -352,35 +335,46 @@ history = convenc.fit(x_2_train_final, x_2_train_final,
             validation_data=(x_2_test_final, x_2_test_final))
 
 # %%
-plt.plot(history.history['loss'])
-plt.plot(history.history['val_loss'])
+plt.plot(history.history['loss'], label='training loss')
+plt.plot(history.history['val_loss'], label='validation loss')
+plt.legend()
+plt.show()
+
 
 # %% [markdown]
 # # Model 2 Resutls
 # Below I am using the trained Autoencoder to predict the test data. Then I'm printing out a set of reconstructed screw images just to get a sense of how well the model is trained.
 
 # %%
-input_samp = x_2_test_final
-print(f"Input Shape: {input_samp.shape}")
+def process_with_model(func, array):
+    input_shape = array.shape
+    num, width, height, channel = input_shape
+    output = None
+    for i in range(num):
+        batch = func(array[i].reshape(1, width, height, channel)).numpy()
+        if output is None:
+            output = np.zeros(batch.shape, dtype='float')
+        output = np.concatenate((output, batch), axis=0)
+    return output[1:]
+
 
 # %%
 os.environ["XLA_FLAGS"]="--xla_gpu_cuda_data_dir=/home/drew/conda/envs/tf_env/"
-encoded_samp = convenc.encoder(input_samp)
-print(f"Encoded Shape: {encoded_samp[:15:].shape}")
+encoded_samp = process_with_model(convenc.encoder, x_2_test_final[:16])
 
 
 # %%
-os.environ["XLA_FLAGS"]="--xla_gpu_cuda_data_dir=/opt/cuda/"
-out_put = convenc.decoder(encoded_samp)
-print(f"Decoded Shape: {out_put.shape}")
-img_list = tf.reshape(out_put, [160, 200, 200, 1])
+os.environ["XLA_FLAGS"]="--xla_gpu_cuda_data_dir=/home/drew/conda/envs/tf_env/"
+out_put = process_with_model(convenc.decoder, encoded_samp)
+print(out_put.shape)
 
 # %%
 plt.figure(figsize=(8, 8))
-for i, img in enumerate(img_list[:16:]):
+for i, img in enumerate(out_put):
     ax = plt.subplot(4, 4, i + 1)
     plt.imshow(img, cmap='gray')
     plt.axis('off')
+plt.savefig("./images/output_sample.png")
 plt.show()
 
 # %% [markdown]
@@ -413,10 +407,15 @@ x_good_np = np.array(
 )
 
 # %%
-enc_x = convenc.encoder(x_good_np).numpy()
+x_testset = x_good_np
 
 # %%
-dec_x = convenc.decoder(enc_x).numpy()
+enc_x = process_with_model(convenc.encoder, x_testset)
+print(enc_x.shape)
+
+# %%
+dec_x = process_with_model(convenc.decoder, enc_x)
+print(dec_x.shape)
 
 # %% [markdown]
 # ### Anomalous Test Data Init
@@ -443,19 +442,23 @@ x_anom_np = np.array(
 x_anom_np = x_anom_np[41:]
 
 # %%
-enc_x_anom = convenc.encoder(x_anom_np).numpy()
+num, width, height, channel = x_anom_np.shape
 
 # %%
-dec_x_anom = convenc.decoder(enc_x_anom).numpy()
+enx_c_anom = process_with_model(convenc.encoder, x_anom_np)
+
+# %%
+dec_x_anom = process_with_model(convenc.decoder, enc_x_anom)
 
 # %% [markdown]
 # ## Calculating the Loss
 # -----
 
 # %%
+print(f"Test Set Shape: {x_testset.shape}\nReconstructed Set Shape: {dec_x.shape}")
 num, width, height, _ = dec_x.shape
 y_pred = dec_x.reshape(num, width * height)
-y_true = x_good_np.reshape(num, width * height)
+y_true = x_testset.reshape(num, width * height)
 loss = np.mean(abs(y_true - y_pred), axis=-1)
 plt.hist(loss, bins=20)
 plt.xlabel("Loss Distribution for Normal Data")
@@ -483,8 +486,12 @@ loss_anom_hist = np.histogram(loss_anom, bins=41)
 anom_bar_y = loss_anom_hist[0] / loss_anom_hist[0].max()
 anom_bar_x = loss_anom_hist[1][1:]
 
+# %% [markdown]
+# ## Setting the Threshold
+# Below I am setting the threshold value for classifying images as normal or anomalous.
+
 # %%
-threshold_anom = np.mean(loss) + np.std(loss)
+threshold_anom = np.mean(loss) - np.std(loss)
 print("Threshold: ", threshold_anom)
 
 # %%
@@ -508,12 +515,18 @@ plt.savefig("./images/anom_norm_dist.png", dpi=300, bbox_inches='tight', pad_inc
 plt.show()
 
 
+# %% [markdown]
+# # Final Output and Accuracy Score
+# The final look at the models performance shows that there is a lot of room for improvement, however it is working as a proof of concept. Going further I would want to move away from a purely convolutional model because I think it is not abstracting enough away from the images. It seems to be doing a really good job of reconstructing images in general, but it needs to be tuned or some focus mechanism introduced to narrow its output space.
+
 # %%
 def predict(model, data, threshold):
-    encoded = model.encoder(data).numpy()
-    reconstructions = model.decoder(encoded).numpy().reshape(119, 40000)
-    model_loss = tf.keras.losses.mae(reconstructions, data.reshape(119, 40000))
-    return tf.math.less(model_loss, threshold)
+    encoded = process_with_model(model.encoder, data)
+    reconstructions = process_with_model(model.decoder, encoded)
+    num, width, height, _ = reconstructions.shape
+    reconstructions = reconstructions.reshape(num, width * height)
+    model_loss = tf.keras.losses.mae(reconstructions, data.reshape(num, width * height))
+    return tf.math.less(threshold, model_loss)
 
 
 # %%
