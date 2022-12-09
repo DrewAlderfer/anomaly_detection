@@ -1,30 +1,36 @@
+# %% [markdown]
+# # Anomaly Detection
+# ## Distinguishing between Normal and Damaged Screws
+# In this project I am trying to figure out how to use autoencoders to perform a binary classification
+# on a dataset of images. Each image in the set depicts a single screw. The training set has all
+# "normal" undamaged screws and the test set has a mixture of damaged and undamaged screws.
+
 # %%
-from glob import glob
 import os
 import pathlib
 import pprint as pp
+from glob import glob
 
 from keras.api._v2.keras.layers import Conv3DTranspose
 
 pp.PrettyPrinter(indent=4)
 import pickle
 
-import numpy as np
 import matplotlib.pyplot as plt
-import pandas as pd
+import numpy as np
 import tensorflow as tf
-
 from sklearn.metrics import accuracy_score, precision_score, recall_score
 from sklearn.model_selection import train_test_split
-from tensorflow.keras import layers, losses, Sequential
+from tensorflow.keras import Sequential, layers, losses
 from tensorflow.keras.models import Model
-
-# %%
-print(tf.config.set_visible_devices.__doc__)
+from tensorflow.keras.utils import image_dataset_from_directory
 
 # %%
 train_data = glob("./data/screw/train/good/*")
 test_data = glob("./data/screw/test/**/*")
+
+# %%
+print(f"train samples: {len(train_data)} | test samples: {len(test_data)}")
 
 # %% [markdown]
 # ### Training Data
@@ -70,14 +76,6 @@ do_this = False
 for ax in ax_list.flatten():
     img_num = np.random.randint(0, len(train_data))
     img = plt.imread(train_data[img_num])
-    img_data = img.reshape(1024 * 1024)
-    img_data = img_data * 1024
-    counts, values = np.histogram(img_data, bins=60, range=(0, 1024))
-    counts = counts**.5 / 2
-    counts = (counts/counts.max() * 1024) / 4
-    values = values[1:]
-    bar_width = np.diff(values)
-    ax.bar(values, counts, width=bar_width[0], alpha=.3)
     ax.matshow(img, cmap='gray', alpha=1, origin='lower')
     ax.set_title(f"image number {img_num}", fontsize=10)
     ax.set_xlim([0, 1024])
@@ -97,6 +95,32 @@ for ax in ax_test_sample.flatten():
 fig_test_samp.tight_layout()
 plt.savefig("./images/eda_anom_grid.png")
 plt.show()
+
+# %%
+# TODO: Generalize this into a helper function
+plt.figure(figsize=(8,8))
+for images, labels in x_train:
+    for i in range(9):
+        ax = plt.subplot(3, 3, i + 1)
+        plt.imshow(images[i].numpy().astype("float16"), cmap='gray')
+        plt.title(train_classes[0])
+        plt.axis('off')
+plt.savefig("./images/eda_train_samp.png")
+plt.close()
+
+
+# %% [markdown]
+# ##### TODO:
+# *You should generalize the above the cell into a util function.*
+#
+# ## Training Data Sample
+# A sample of images from the training set with their cooresponding label.
+# <img src='./images/eda_train_samp.png' align="left">
+
+# %% [markdown]
+# ## First Model
+# For the first model I used a very basic autoencoder. It has only a few dense layers to compress
+# and then reconstruct the images with.
 
 # %%
 class Autoencoder(Model):
@@ -119,14 +143,16 @@ class Autoencoder(Model):
         decoded = self.decoder(encoded)
         return decoded
 
-# %%
-print(f"train samples: {len(train_data)} | test samples: {len(test_data)}")
+# %% [markdown]
+# ## Now that my first model is coded and ready to train I will pull al my test data into a training
+# and testing `tf.Dataset` objects. This will allow me to work with them as tensors.
 
 # %%
 train_dir = "./data/screw/train/"
 train_dir = pathlib.Path(train_dir)
 test_dir = "./data/screw/test/"
 test_dir = pathlib.Path(test_dir)
+
 
 # %%
 batch_size, img_height, img_width = (320, 200, 200)
@@ -153,29 +179,8 @@ train_classes = x_train.class_names
 train_classes
 
 
-# %%
-# TODO: Generalize this into a helper function
-plt.figure(figsize=(8,8))
-for images, labels in x_train:
-    for i in range(9):
-        ax = plt.subplot(3, 3, i + 1)
-        plt.imshow(images.numpy().astype("float16"), cmap='gray')
-        plt.title(train_classes[0])
-        plt.axis('off')
-plt.savefig("./images/eda_train_samp.png")
-plt.close()
-
-
 # %% [markdown]
-# ##### TODO:
-# *You should generalize the above the cell into a util function.*
-#
-# ## Training Data Sample
-# A sample of images from the training set with their cooresponding label.
-# <img src='./images/eda_train_samp.png' align="left">
-
-# %% [markdown]
-# ##### Reshape Datasets
+# ## Reshape Datasets
 
 # %%
 x_train_np = np.array(list(map(lambda x : x[0], x_train.as_numpy_iterator())), 'float16')
@@ -196,14 +201,6 @@ with open(f'./data/x_test_{img_height}.pkl', 'wb') as tr_file:
     pickle.dump(x_test_final, tr_file)
 
 # %%
-plt.matshow(x_train_final[2], cmap='gray')
-plt.savefig('./images/eda_single_screw_train.png')
-plt.close()
-
-# %% [markdown]
-# <img src="./images/eda_single_screw_train.png" align="left">
-
-# %%
 latent_dim = 64
 autoencoder = Autoencoder(latent_dim)
 
@@ -216,6 +213,9 @@ autoencoder.fit(x_train_final, x_train_final,
                 epochs=50,
                 shuffle=True,
                 validation_data=(x_test_final, x_test_final))
+
+# %% [markdown]
+# ## The First Results Look Promising
 
 # %%
 encoded_imgs = autoencoder.encoder(x_test_final).numpy()
@@ -236,25 +236,11 @@ for i in range(num_of_imgs):
     ax.axis('off')
 plt.show()
 
-# %%
-class Autoencoder(Model):
-    def __init__(self, filter):
-        super(Autoencoder, self).__init__()
-        self.latent_dim = latent_dim
-        self.encoder = tf.keras.Sequential([
-            layers.Conv2d()
-            ])
-        self.decoder = tf.keras.Sequential([
-            layers.Dense(latent_dim * 4, activation='relu'),
-            layers.Dense(40000, activation='sigmoid'),
-            layers.Reshape((200, 200))
-            ])
-
-    def call(self, x):
-        encoded = self.encoder(x)
-        decoded = self.decoder(encoded)
-        return decoded
-
+# %% [markdown]
+# ## Bellow I am investigating convolutional layers
+# I wanted to move away from dense layer models and try and 2D Convolutional Neural Network based model but first I wanted to try and understand the process a bit better.
+#
+# Below I coded and sobol edge finding matrix and passed a test image and the sobol filter through a custom loop that uses two basic convolution layers to process the image.
 
 # %%
 test_img = x_train_np[3]
@@ -302,35 +288,17 @@ def conv_loop(image, kernels, loops:int=10):
     return out_put
 
 
+# %% [markdown]
+# ## A Representation of the Edges found by the convolution process
+
 # %%
 results  = conv_loop(img_in, kern_list, 100)
 plt.imshow(results[1], cmap='gray')
 
-# %%
-test = results[1].reshape(1, 200, 200)
-encoded_test = autoencoder.encoder(test).numpy()
-decoded_test = autoencoder.decoder(encoded_test).numpy()
-plt.imshow(decoded_test.reshape(200, 200, 1), cmap="magma")
-plt.axis('off')
-plt.savefig('./images/eda_conv_test_2.png')
-plt.show()
 
-# %%
-test = results[0].reshape(1, 200, 200)
-encoded_test = autoencoder.encoder(test).numpy()
-decoded_test = autoencoder.decoder(encoded_test).numpy()
-plt.imshow(decoded_test.reshape(200, 200, 1), cmap="magma")
-plt.axis('off')
-plt.savefig('./images/eda_conv_test.png')
-plt.show()
-
-# %%
-class Sharper(tf.keras.layers.Layer):
-    def __init__(self, input_dim):
-        super(Sharper, self).__init__()
-        self.sharper = self.sharpen(x, kernel, passes)
-    def sharpen(self)
-
+# %% [markdown]
+# # Second Model
+# Below is the subclassed model that I wrote to handle the autoencoding process. It uses a series of convolutional layers to compress the feature space of the images and hoepfully learn a latent representation that will be strong enough to detect anomalous data.
 
 # %%
 class AutoEncoder(Model):
@@ -340,17 +308,10 @@ class AutoEncoder(Model):
             layers.Input(shape=(200, 200, 1)),
             layers.Conv2D(32, (3, 3), activation='relu', padding='same', strides=1),
             layers.Conv2D(16, (3, 3), activation='relu', padding='same', strides=1), # (200, 200, 1, 16)
-            # layers.Reshape((200, 200, 16, 1)),
-            # layers.MaxPool3D((4, 4, 4), padding='same', data_format='channels_last'), # output should be (50, 50, 4, 1)
-            # layers.Flatten(),
-            # layers.Dense(100, activation='relu')
             layers.Conv2D(8, (3, 3), activation='relu', padding='same', strides=1),
             ])
         self.decoder = Sequential([
             layers.Conv2DTranspose(8, 3, strides=2, activation='relu', padding='same'),
-            # layers.Dense(10000, activation='sigmoid'),
-            # layers.Reshape((50, 50, 4, 1)),
-            # layers.Conv3DTranspose(1, 4, activation="sigmoid", padding='same', strides=(4, 4, 4)),
             layers.Conv2D(1, 3, strides=2, activation='sigmoid', padding='same')
             ])
 
@@ -373,45 +334,27 @@ x_2_test_final = x_2_test_final.reshape(160, 200, 200, 1)
 x_2_test_final.shape
 
 # %%
-callback = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=3)
+callback = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=10)
 
 # %%
 convenc = AutoEncoder()
 convenc.compile(optimizer='adam', loss=losses.MeanSquaredError())
 
 # %%
-os.environ["XLA_FLAGS"]="--xla_gpu_cuda_data_dir=/opt/cuda"
-convenc.fit(x_2_train_final, x_2_train_final,
+os.environ["XLA_FLAGS"]="--xla_gpu_cuda_data_dir=/home/drew/conda/envs/tf_env/"
+history = convenc.fit(x_2_train_final, x_2_train_final,
             epochs=100,
             shuffle=True,
             callbacks = [callback],
             validation_data=(x_2_test_final, x_2_test_final))
 
 # %%
-os.environ["XLA_FLAGS"]="--xla_gpu_cuda_data_dir=/home/drew/conda/envs/tf_env/"
-input = x_test_final[80].reshape(1, 200, 200, 1)
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
 
-peek = convenc.encoder(input)
-print(f"Encoder Output: {peek.shape}")
-
-peek = convenc.decoder(peek)
-print(f"Decoder Output: {peek.shape}")
-
-plt.imshow(tf.reshape(peek, [200, 200, 1]), cmap='gray')
-
-
-# %%
-os.environ["XLA_FLAGS"]="--xla_gpu_cuda_data_dir=/opt/cuda/"
-img = x_2_test_final[4]
-input = img.reshape(200, 200, 1)
-print(input.shape)
-
-out_put = convenc.encoder(input)
-restruct = tf.reshape(convenc.decoder(out_put), [200, 200, 1])
-
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(6, 3))
-ax1.imshow(restruct, cmap='gray')
-ax2.imshow(img, cmap='gray')
+# %% [markdown]
+# # Model 2 Resutls
+# Below I am using the trained Autoencoder to predict the test data. Then I'm printing out a set of reconstructed screw images just to get a sense of how well the model is trained.
 
 # %%
 input_samp = x_2_test_final
@@ -437,3 +380,143 @@ for i, img in enumerate(img_list[:16:]):
     plt.axis('off')
 plt.show()
 
+# %% [markdown]
+# # Putting it to the Test
+# The reconstructions about look great, but the real test will be to measure the information loss between these reconstructions and the original images. If we're able to determine that the loss distribution is different between the anomalous and normal screws then we will be able to write an algorithm that classifies them.
+
+# %% [markdown]
+# ### Initializing the Normal Test Set
+
+# %%
+norm_layer = tf.keras.layers.Rescaling(1.0 / 255)
+
+# %%
+test_good = image_dataset_from_directory(
+    "./data/screw/test/good/",
+    labels=None,
+    seed=142,
+    color_mode="grayscale",
+    batch_size=None,
+    image_size=(200, 200),
+)
+
+# %%
+test_good_norm = test_good.map(lambda x: (norm_layer(x)))
+print(type(test_good_norm))
+
+# %%
+x_good_np = np.array(
+    list(map(lambda x: x, test_good_norm.as_numpy_iterator())), "float32"
+)
+
+# %%
+enc_x = convenc.encoder(x_good_np).numpy()
+
+# %%
+dec_x = convenc.decoder(enc_x).numpy()
+
+# %% [markdown]
+# ### Anomalous Test Data Init
+# ----------------
+
+# %%
+test_anom = image_dataset_from_directory(
+    "./data/screw/test/",
+    labels=None,
+    shuffle=False,
+    color_mode="grayscale",
+    batch_size=None,
+    image_size=(200, 200),
+)
+
+# %%
+test_anom_norm = test_anom.map(lambda x: (norm_layer(x)))
+
+# %%
+x_anom_np = np.array(
+    list(map(lambda x: x, test_anom_norm.as_numpy_iterator())), "float32"
+)
+# Separate the Anomalous Screws from the Normal Test Set
+x_anom_np = x_anom_np[41:]
+
+# %%
+enc_x_anom = convenc.encoder(x_anom_np).numpy()
+
+# %%
+dec_x_anom = convenc.decoder(enc_x_anom).numpy()
+
+# %% [markdown]
+# ## Calculating the Loss
+# -----
+
+# %%
+num, width, height, _ = dec_x.shape
+y_pred = dec_x.reshape(num, width * height)
+y_true = x_good_np.reshape(num, width * height)
+loss = np.mean(abs(y_true - y_pred), axis=-1)
+plt.hist(loss, bins=20)
+plt.xlabel("Loss Distribution for Normal Data")
+plt.ylabel("No. of Samples")
+plt.show()
+
+# %%
+y_anom_pred = dec_x_anom.reshape(119, 40000)
+y_anom_true = x_anom_np.reshape(119, 40000)
+loss_anom = np.mean(abs(y_anom_true - y_anom_pred), axis=-1)
+
+# %%
+plt.hist(loss_anom, bins=12)
+plt.xlabel("Loss Distribution for Anomalous Data")
+plt.ylabel("No. of Samples")
+plt.show()
+
+# %%
+loss_hist = np.histogram(loss, bins=20)
+loss_max = loss_hist[0].max()
+norm_bar_y = loss_hist[0] / loss_max
+norm_bar_x = loss_hist[1][1:]
+
+loss_anom_hist = np.histogram(loss_anom, bins=41)
+anom_bar_y = loss_anom_hist[0] / loss_anom_hist[0].max()
+anom_bar_x = loss_anom_hist[1][1:]
+
+# %%
+threshold_anom = np.mean(loss) + np.std(loss)
+print("Threshold: ", threshold_anom)
+
+# %%
+norm_y, norm_x = np.histogram(loss, bins=20)
+norm_y = norm_y / norm_y.max()
+
+anom_y, anom_x = np.histogram(loss_anom, bins=20)
+anom_y = anom_y / anom_y.max()
+
+# %%
+fig, ax = plt.subplots(figsize=(8,5))
+ax.stairs(norm_y, norm_x, hatch=('...'), label="Normal")
+ax.axvline(x=threshold_anom, c='black', linestyle='--', alpha=.8, label="Threshold")
+ax.stairs(anom_y, anom_x, hatch='///', label="Anomalous")
+fig.tight_layout()
+plt.xlabel("Loss Values")
+plt.ylabel("Number of Values per Bin")
+plt.title("Relative Distributions of Loss Values")
+plt.legend()
+plt.savefig("./images/anom_norm_dist.png", dpi=300, bbox_inches='tight', pad_inches=.5)
+plt.show()
+
+
+# %%
+def predict(model, data, threshold):
+    encoded = model.encoder(data).numpy()
+    reconstructions = model.decoder(encoded).numpy().reshape(119, 40000)
+    model_loss = tf.keras.losses.mae(reconstructions, data.reshape(119, 40000))
+    return tf.math.less(model_loss, threshold)
+
+
+# %%
+os.environ["XLA_FLAGS"] = "--xla_gpu_cuda_data_dir=/home/drew/conda/envs/tf_env/"
+preds = predict(convenc, x_anom_np, threshold_anom)
+
+# %%
+accuracy = (119 - np.count_nonzero(preds)) / 119
+print(f"Accuracy Score: {accuracy*100:.2f}")
