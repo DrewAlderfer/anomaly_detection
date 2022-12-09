@@ -55,5 +55,47 @@ or other simple convolutional functions could improve performance, and focus the
 features.
 <img src="./images/output_sample.png">Output Images from the Final Model</img>
 
-
-
+```shell
+├── data
+│   ├── metal_nut
+│   │   ├── ground_truth
+│   │   │   ├── bent
+│   │   │   ├── color
+│   │   │   ├── flip
+│   │   │   └── scratch
+│   │   ├── test
+│   │   │   ├── bent
+│   │   │   ├── color
+│   │   │   ├── flip
+│   │   │   ├── good
+│   │   │   └── scratch
+│   │   └── train
+│   │       └── good
+│   └── screw
+│       ├── ground_truth
+│       │   ├── manipulated_front
+│       │   ├── scratch_head
+│       │   ├── scratch_neck
+│       │   ├── thread_side
+│       │   └── thread_top
+│       ├── test
+│       │   ├── good
+│       │   ├── manipulated_front
+│       │   ├── scratch_head
+│       │   ├── scratch_neck
+│       │   ├── thread_side
+│       │   └── thread_top
+│       └── train
+│           └── good
+├── images
+├── models
+│   └── conv_model_01
+│       ├── assets
+│       └── variables
+└── util
+    ├── func
+    │   └── __pycache__
+    ├── models
+    │   └── __pycache__
+    └── __pycache__
+```
