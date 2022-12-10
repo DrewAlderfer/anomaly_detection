@@ -53,7 +53,7 @@ I am continuing to investigate ways of improving this process's accuracy and con
 to try different loss functions and see if applying different preprocessing methods like sobel filtering
 or other simple convolutional functions could improve performance, and focus the model on specific
 features.
-<img src="./images/output_sample.png">Output Images from the Final Model</img>
+<img src="./images/output_sample.png"></img>
 
 ```shell
 ├── data
