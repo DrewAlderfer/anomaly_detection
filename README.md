@@ -55,7 +55,13 @@ or other simple convolutional functions could improve performance, and focus the
 features.
 <img src="./images/output_sample.png"></img>
 
+
+##### Citations:
+Markus Ulrich, Patrick Follmann, Jan-Hendrik Neudeck: A comparison of shape-based matching with deep-learning-based object detection; in: Technisches Messen, 2019, DOI: 10.1515/teme-2019-0076.
+
+-----
 ```shell
+root
 ├── data
 │   ├── metal_nut
 │   │   ├── ground_truth
