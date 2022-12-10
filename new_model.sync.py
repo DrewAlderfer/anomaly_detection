@@ -36,7 +36,7 @@ img_tensor.shape
 
 # %%
 output = tf.image.sobel_edges(img_tensor)
-output_x = np.asarray(output[0, :, :, :, :0])
+output_x = np.asarray(output[0, :, :, :, 0])
 output_y = np.asarray(output[0, :, :, :, 1])
 
 # %%
@@ -63,18 +63,6 @@ print(img_blur.shape)
 img_blur_t = tf.reshape(tf.convert_to_tensor(img_blur, dtype=tf.float32), [1, 1024, 1024, 1])
 
 # %%
-plt.imshow(img_blur, cmap="gray")
-
-# %%
-blur_edges = tf.image.sobel_edges(img_blur_t)
-x_t = np.asarray(blur_edges[0, :, :, :, 0])
-y_t = np.asarray(blur_edges[0, :, :, :, 1])
-edges_new = np.sqrt(x_t**2 + y_t**2)
-
-# %%
-plt.imshow(edges_new, cmap='gray')
-
-# %%
 edge_obj = SobelEdges("./data/metal_nut/train/good/002.png", blur=3)
 edge_obj.display_edges(cmap='gray')
 
@@ -82,3 +70,5 @@ edge_obj.display_edges(cmap='gray')
 screw_edges = SobelEdges("./data/screw/test/manipulated_front/011.png", blur=0, resize=(200, 200))
 fig, ax = screw_edges.display_edges(cmap='gray')
 ax.axis('off')
+
+# %%
