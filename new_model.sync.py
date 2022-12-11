@@ -64,11 +64,23 @@ img_blur_t = tf.reshape(tf.convert_to_tensor(img_blur, dtype=tf.float32), [1, 10
 
 # %%
 edge_obj = SobelEdges("./data/metal_nut/train/good/002.png", blur=3)
-edge_obj.display_edges(cmap='gray')
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+ax1.imshow(edge_obj.bw_edges(), cmap='gray')
+ax1.axis('off')
+ax2.imshow(edge_obj.rgb_edges())
+plt.axis('off')
+plt.savefig('./images/nut_graph.png')
+plt.show()
 
 # %%
-screw_edges = SobelEdges("./data/screw/test/manipulated_front/011.png", blur=0, resize=(200, 200))
-fig, ax = screw_edges.display_edges(cmap='gray')
-ax.axis('off')
+screw_edges = SobelEdges("./data/screw/test/manipulated_front/011.png", blur=3)
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+ax1.imshow(screw_edges.bw_edges(), cmap='gray')
+ax1.axis('off')
+ax2.imshow(screw_edges.rgb_edges())
+ax2.axis('off')
+plt.savefig('./images/screw_edges.png')
+plt.show()
 
 # %%
+type(screw_edges.get_rgb_edges())

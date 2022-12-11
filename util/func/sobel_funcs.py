@@ -40,7 +40,8 @@ class SobelEdges:
             self.width, self.height = self.shape
             self.channels = 1
         self.blur_amount = blur
-        self.edges = self._process_edges()
+        self.x_g, self.y_g = self._process_edges()
+        self.angle_map = np.arctan2(self.y_g, self.x_g)
 
     def _process_edges(self):
         blurred = self.image.filter(ImageFilter.GaussianBlur(self.blur_amount))
@@ -54,26 +55,33 @@ class SobelEdges:
                                                                          self.height,
                                                                          self.channels])
         edge_tensor = sobel_edges(blurred_tensor)
-        x_t = np.asarray(edge_tensor[0, :, :, :, 0])
-        y_t = np.asarray(edge_tensor[0, :, :, :, 1])
+        x_g = np.asarray(edge_tensor[0, :, :, :, 0])
+        y_g = np.asarray(edge_tensor[0, :, :, :, 1])
 
-        return np.sqrt(x_t**2 + y_t**2)
+        return (x_g, y_g)
+    
+    def rgb_edges(self):
+        """
+        This method combines the angle_map and bw_edges attributes into a rgb map where the angle is
+        used as the hue and bw_edges the value attributes of an hsv image tensor. That tensor is then
+        converted into an rgb image for display.
 
-    def display_edges(self, **kwargs):
+        returns tf.tensor with shape (width, height, 3)
         """
-        A function to display the output of the sobel_edges layer.
-        Parameters:
-            **kwargs:   Will take keyword arguments related to the pyplot.subplots and pyplot.imshow
-                        objects.
-                        Ex:
-                            figsize=(10, 4), cmap='gray'
-        Returns:
-            A tuple with the created (fig, ax) objects for the image plot.
+        hue = self.angle_map
+        saturation = np.ones((self.width, self.height, 1), dtype='float')
+        value = self.bw_edges()
+        # Map array values from 0 to 1
+        hue = (hue + np.pi) / (np.pi * 2)                       # Hue is an agle in radians from negative to positive PI, this remaps it to 0 to 1
+        value = (value - value.min()) / value.max()
+
+        hsv_img = np.concatenate((hue, saturation, value), axis=2)
+        rgb_img = tf.image.hsv_to_rgb(hsv_img).numpy()
+        return rgb_img
+        
+    def bw_edges(self):
         """
-        subplots_args = list(inspect.signature(plt.subplots).parameters)
-        subplots_dict = {k: kwargs.pop(k) for k in dict(kwargs) if k in subplots_args}
-        fig, ax = plt.subplots(**subplots_dict)
-        imshow_args = list(inspect.signature(plt.imshow).parameters)
-        imshow_dict = {k: kwargs.pop(k) for k in dict(kwargs) if k in imshow_args}
-        ax.imshow(self.edges, **imshow_dict)
-        return fig, ax
+        Returns a grayscale representation of the sobel edges.
+        """
+        return np.sqrt(self.x_g**2 + self.y_g**2)
+
