@@ -67,7 +67,7 @@ edge_obj = SobelEdges("./data/metal_nut/train/good/002.png", blur=3)
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 ax1.imshow(edge_obj.bw_edges(), cmap='gray')
 ax1.axis('off')
-ax2.imshow(edge_obj.rgb_edges())
+ax2.imshow(mcolors.hsv_to_rgb(edge_obj.hsv_edges()))
 plt.axis('off')
 plt.savefig('./images/nut_graph.png')
 plt.show()
@@ -77,10 +77,32 @@ screw_edges = SobelEdges("./data/screw/test/manipulated_front/011.png", blur=3)
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 ax1.imshow(screw_edges.bw_edges(), cmap='gray')
 ax1.axis('off')
-ax2.imshow(screw_edges.rgb_edges())
+ax2.imshow(mcolors.hsv_to_rgb(screw_edges.hsv_edges()))
 ax2.axis('off')
 plt.savefig('./images/screw_edges.png')
 plt.show()
 
+
 # %%
-type(screw_edges.get_rgb_edges())
+class SobelLayer(tf.keras.layers.Layer):
+    def __init__(self, blur, activation=None):
+        super().__init__()
+        self.activation = activation
+        self.edgefinder = SobelEdges
+        self.blur = blur
+
+    def build(self, input_shape):
+        self.w = self.add_weight(
+                shape=(input_shape[-1]),
+                initializer="random_normal",
+                trainable=True)
+                
+        self.b = self.add_weight(
+                shape=(1,), initializer="zeros", trainable=True)
+
+    def call(self, input):
+        blur = self.blur + self.b
+        x = self.edgefinder(input, self.blur)
+        x = x.hsv_edges()
+        return tf.matmul(tf.add(input, x), self.w)
+        

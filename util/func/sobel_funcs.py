@@ -60,24 +60,20 @@ class SobelEdges:
 
         return (x_g, y_g)
     
-    def rgb_edges(self):
+    def hsv_edges(self):
         """
-        This method combines the angle_map and bw_edges attributes into a rgb map where the angle is
-        used as the hue and bw_edges the value attributes of an hsv image tensor. That tensor is then
-        converted into an rgb image for display.
+        This method combines the angle_map and bw_edges attributes into a hsv map where the sin of 
+        the gradient is used as the hue and the magnitude of the gradient is the value attributes 
+        of an hsv image tensor. That tensor is then converted into an rgb image for display.
 
         returns tf.tensor with shape (width, height, 3)
         """
-        hue = self.angle_map
+        hue = (self.angle_map + np.pi) / (np.pi * 2)                            # angle_map is in radians from - to  this remaps it to 0 to 1
         saturation = np.ones((self.width, self.height, 1), dtype='float')
         value = self.bw_edges()
-        # Map array values from 0 to 1
-        hue = (hue + np.pi) / (np.pi * 2)                       # Hue is an agle in radians from negative to positive PI, this remaps it to 0 to 1
         value = (value - value.min()) / value.max()
 
-        hsv_img = np.concatenate((hue, saturation, value), axis=2)
-        rgb_img = tf.image.hsv_to_rgb(hsv_img).numpy()
-        return rgb_img
+        return np.concatenate((hue, saturation, value), axis=2) 
         
     def bw_edges(self):
         """
